@@ -18,8 +18,8 @@ def one_shot(data, marking_functions, state_bcs, multiplier_bcs, alpha,
     V = data.function_space()
     mesh = V.mesh()
     # For integration we will use ...
-    facet_f = entity_functions[mesh.topology().dim()-1]
-    point_f = entity_functions[0]
+    facet_f = marking_functions[mesh.topology().dim()-1]
+    point_f = marking_functions[0]
     # ... the surface measure
     ds = Measure('ds', domain=mesh, subdomain_data=facet_f)
     # Point measure, here we only care about tagged/no tagged destinction
@@ -72,6 +72,7 @@ if __name__ == '__main__':
                 # in the inner hole compared to the outer boundary
                 sizes={'in_min': 2*np.pi*inner_r/40, 'in_max': 1,
                        'out_min': 2*np.pi*outer_r/200, 'out_max': 1})
+
     mesh, entity_functions, inside_points = gmsh_mesh(points,
                                                       bounding_shape=disk,
                                                       argv=sys.argv)
@@ -105,3 +106,5 @@ if __name__ == '__main__':
     File('state.pvd') << state
     File('control.pvd') << control
     File('multipler.pvd') << multiplier
+
+    print('DONE')

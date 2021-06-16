@@ -6,9 +6,9 @@ from dolfin_adjoint import *
 import moola
 import matplotlib.pyplot as plt
 np.random.seed(1)
-from fenics2nparray import fenics2nparray
+from fenics2nparray import fenics2nparray_2D, fenics2nparray_1D
 from scipy.spatial import Delaunay
-#import dolfin as df
+import dolfin as df
 import ufl
 
 def delaunay_mesh(points_2d):
@@ -28,8 +28,8 @@ def build_mesh(vertices, cells):
     ncells, tdim_ = cells.shape
     tdim = tdim_ - 1
 
-    mesh = Mesh()
-    editor = MeshEditor()
+    mesh = df.Mesh()
+    editor = df.MeshEditor()
 
     cell_type = {1: 'interval',
                  2: 'triangle',
@@ -210,7 +210,7 @@ def create_synthetic_pO2_data(mesh, hole, sigma):
 
     return p, p_noisy, V, W, bc, p_ves, R_ves
 
-def estimate_M(p_data, V, W, bc, alpha):
+def estimate_M(p_data, V, W, bc, alpha, data_norm=lambda x: inner(x, x)*dx):
 
     ### Solve forward problem (needed for moola)
     p = TrialFunction(V)
@@ -219,11 +219,14 @@ def estimate_M(p_data, V, W, bc, alpha):
     a = inner(grad(p), grad(v))*dx
     L = -M*v*dx
     p = Function(V, name='State')
+
+    print(a, L, solve)
+
     solve(a == L, p, bc)
 
     ### Set up the functional:
     control = Control(M)
-    functional = (0.5*inner(p_data-p,p_data-p) + (alpha/2)*inner(grad(M), grad(M)))*dx
+    functional = 0.5*data_norm(p_data-p) + (alpha/2)*inner(grad(M), grad(M))*dx
     J = assemble(functional)
     rf = ReducedFunctional(J, control)
 
@@ -278,10 +281,18 @@ if __name__ == "__main__":
 #    data = np.load(filename)
 #    x = data['x']
 #    y = data['y']
-###    p_exact = fenics2nparray(p_exact, 0, x, y)
-#    p_noisy = fenics2nparray(p_noisy, 0, x, y)
-#    p_opt = fenics2nparray(p_opt, 0, x, y)
-#    M_opt = fenics2nparray(M_opt, 0, x, y)
+###    p_exact = fenics2nparray_2D(p_exact, 0, x, y)
+#    p_noisy = fenics2nparray_2D(p_noisy, 0, x, y)
+#    p_opt = fenics2nparray_2D(p_opt, 0, x, y)
+#    M_opt = fenics2nparray_2D(M_opt, 0, x, y)
 #    
 #    np.savez('results/experimental_example_1b_alpha_2_0.npz', p_noisy=p_noisy, p_opt=p_opt, M_opt=M_opt, x=x, y=y, alpha=alpha)
 
+    data = np.load(filename)
+    x = data['x']
+    y = data['y']
+    p_noisy = fenics2nparray_1D(p_noisy, x, y)
+    p_opt = fenics2nparray_1D(p_opt, x, y)
+    M_opt = fenics2nparray_1D(M_opt, x, y)
+    
+    np.savez('results/xyz_example_data_a_np.npz', p_noisy=p_noisy, p_opt=p_opt, M_opt=M_opt, x=x, y=y, alpha=alpha)
