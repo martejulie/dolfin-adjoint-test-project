@@ -7,7 +7,6 @@ from fenics import *
 from dolfin_adjoint import *
 
 from fenics2nparray import fenics2nparray_1D
-from gmsh_mesh import *
 
 class Shape:
     TOL = 1E-1
