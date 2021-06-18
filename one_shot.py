@@ -54,7 +54,7 @@ if __name__ == '__main__':
     from gmsh_mesh import Disk, gmsh_mesh, RectangleHole
     import sys
     
-    data = np.load('./xyz_example_data_rectangular.npz')
+    data = np.load('experimental_data/xyz_example_data_radial.npz')
 
     points = np.c_[data['x'], data['y']]
     data_points = data['z'].flatten()
