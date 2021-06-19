@@ -56,7 +56,7 @@ if __name__ == '__main__':
     from postproc import *
     import sys
     
-    data = np.load('./xyz_example_data_rectangular.npz')
+    data = np.load('experimental_data/xyz_example_data_radial.npz')
 
     points = np.c_[data['x'], data['y']]
     data_points = data['z'].flatten()
