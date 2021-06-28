@@ -164,14 +164,26 @@ class Rectangle(Shape):
 
 
 class RectangleHole(Shape):
-    '''Rectangle with circle hole enclosing points'''
+    '''Rectangle with circle(s) hole enclosing points'''
     def __init__(self, ll, ur, center, radius, sizes=None):
         assert np.all((ur - ll) > 0)
-        assert all(np.all(np.logical_and(ll < center + radius*shift, center + radius*shift < ur))
-                   for shift in np.array([[1, 0],
-                                          [0, 1],
-                                          [-1, 0],
-                                          [0, -1]]))
+
+        if not isinstance(center, tuple):
+            center = (center, )
+        if not isinstance(radius, tuple):
+            radius = (radius, )
+
+        # All circles fit inside
+        shifts = np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])
+        for c, r in zip(center, radius):
+            assert all(np.all(np.logical_and(ll < c + r*shift, c + r*shift < ur))
+                       for shift in shifts)
+        # The circles do not collide
+        c_r = tuple(zip(center, radius))
+        for i, (ci, ri) in enumerate(c_r):
+            for cj, rj in c_r[i+1:]:
+                assert np.linalg.norm(ci - cj, 2)**2 > (min(ri, rj)+self.TOL)**2
+        
         self.ll = ll
         self.ur = ur
         self.center = center
@@ -183,42 +195,55 @@ class RectangleHole(Shape):
 
     def is_inside(self, points):
         x, y = points.T
+
+        outside_circles = np.ones(len(points), dtype=bool)
+        for c, r in zip(self.center, self.radius):
+            outside_circles *= np.linalg.norm(points - c, 2, axis=1)**2 > (r+self.TOL)**2
+        
         return self.filter(np.logical_and(
             # Inside square
             np.logical_and(np.logical_and(x > self.ll[0]+self.TOL, x < self.ur[0]-self.TOL),
                            np.logical_and(y > self.ll[1]+self.TOL, y < self.ur[1]-self.TOL)),
-            np.linalg.norm(points - self.center, 2, axis=1)**2 > (self.radius+self.TOL)**2
+            outside_circles
         ))
     
     def insert_gmsh(self, model, factory):
         ll = self.ll
         dx = self.ur - self.ll
-        cx, cy = self.center
-        radius = self.radius
-
+        # Outside
         sq_points = (ll, ll+np.array([dx[0], 0]), ll+dx, ll+np.array([0, dx[1]]))
         sq_points = [factory.addPoint(x, y, z=0) for x, y in sq_points]
 
         n = len(sq_points)
         sq_lines = [factory.addLine(p, q) for p, q in zip(sq_points, chain(sq_points[1:], sq_points))]
-        
-        circle = factory.addCircle(cx, cy, 0, radius)        
+
+        circles = []
+        for center, radius in zip(self.center, self.radius):
+            cx, cy = center
+            circles.append(factory.addCircle(cx, cy, 0, radius))
 
         sloop = factory.addCurveLoop(sq_lines)
-        cloop = factory.addCurveLoop([circle])        
+        cloops = [factory.addCurveLoop([circle]) for circle in circles]
 
-        shape = factory.addPlaneSurface([cloop, sloop])
+        shape = factory.addPlaneSurface(cloops + [sloop])
 
         factory.synchronize()
         
         model.addPhysicalGroup(2, [shape], tag=1)
 
         bdry = set([p[1] for p in model.getBoundary([(2, shape)])])
-        circle_bdry,  = bdry - set(sq_lines)
-        # This is circle
-        model.addPhysicalGroup(1, [circle_bdry], 1)        
+        circle_bdry  = list(bdry - set(sq_lines))
+
+        for tag, center in enumerate(self.center, 1):
+            the_curve = min(circle_bdry,
+                            key=lambda curve, c=center: np.linalg.norm(factory.getCenterOfMass(1, curve)[:2]-c))
+            assert np.linalg.norm(factory.getCenterOfMass(1, the_curve)[:2]-center) < 1E-10
+            # We label the inner surfaces by the centers as given by the user
+            model.addPhysicalGroup(1, [the_curve], tag)
+        tag += 1
+        
         # This is square
-        for tag, curve in enumerate(sq_lines, 2):
+        for tag, curve in enumerate(sq_lines, tag):
             model.addPhysicalGroup(1, [curve], tag)
 
         if self.sizes is not None:
@@ -227,7 +252,7 @@ class RectangleHole(Shape):
             
             fields = []
             idx = 0
-            for prefix, curves in zip(('in_', 'out_'), ([circle_bdry], sq_lines)):
+            for prefix, curves in zip(('in_', 'out_'), (circle_bdry, sq_lines)):
                 idx += 1                
                 model.mesh.field.add('Distance', idx)
                 model.mesh.field.setNumbers(idx, 'CurvesList', curves)
