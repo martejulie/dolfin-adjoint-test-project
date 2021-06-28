@@ -227,6 +227,7 @@ def estimate_M(p_data, V, W, bc, alpha, data_norm=lambda x: inner(x, x)*dx):
     ### Set up the functional:
     control = Control(M)
     functional = 0.5*data_norm(p_data-p) + (alpha/2)*inner(grad(M), grad(M))*dx
+
     J = assemble(functional)
     rf = ReducedFunctional(J, control)
 
@@ -239,6 +240,12 @@ def estimate_M(p_data, V, W, bc, alpha, data_norm=lambda x: inner(x, x)*dx):
     L = -M_opt*v*dx
     p_opt = Function(V)
     solve(a == L, p_opt, bc)
+    
+    data_term = assemble(0.5*data_norm(p_data-p_opt))
+    regular_term = assemble((alpha/2)*inner(grad(M_opt), grad(M_opt))*dx)
+    
+    print('first term:', data_term)
+    print('second term:', regular_term)
 
     return p_opt, M_opt
 

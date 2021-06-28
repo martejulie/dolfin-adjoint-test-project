@@ -285,8 +285,8 @@ def gmsh_mesh(embed_points, bounding_shape, argv=[]):
     factory.synchronize()
 
     # NOTE: if you want to see it first
-    gmsh.fltk.initialize()
-    gmsh.fltk.run()
+    # gmsh.fltk.initialize()
+    # gmsh.fltk.run()
         
     nodes, topologies = msh_gmsh_model(model,
                                        2)
